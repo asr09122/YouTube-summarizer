@@ -10,8 +10,10 @@ COPY postcss.config.js ./
 COPY tailwind.config.js ./
 COPY src ./src
 COPY index.html ./
+COPY .env .env
 
 RUN npm install
+
 RUN npm run build
 
 # Production stage
