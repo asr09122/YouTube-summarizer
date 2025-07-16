@@ -35,11 +35,7 @@ llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     model="google/gemma-3-12b-it:free",
     temperature=0.2,
-<<<<<<< HEAD
     api_key=openai_api_key or "dummy-key",
-=======
-    api_key=openai_api_key or "dummy-key"
->>>>>>> 61c0689124276422fb62bfd1b67cfe2b1f4045ab
 )
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
