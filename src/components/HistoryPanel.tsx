@@ -23,10 +23,10 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ userId, onSelectItem }) => 
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-<<<<<<< HEAD
+
   const [filterType, setFilterType] = useState('all'); // Added to fix ReferenceError
-=======
->>>>>>> 61c0689124276422fb62bfd1b67cfe2b1f4045ab
+
+
 
   const fetchHistory = async () => {
     if (!userId) return;

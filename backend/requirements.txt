@@ -1,0 +1,1 @@
+// This file will be moved to backend/requirements.txt for deployment simplicity. 

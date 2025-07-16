@@ -8,30 +8,18 @@ import VideoUploader from './components/VideoUploader';
 import SummaryDisplay from './components/SummaryDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import { Brain, Youtube, Sparkles, Zap } from 'lucide-react';
-<<<<<<< HEAD
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
 function Dashboard({ user, setUser, ...props }: any) {
-=======
-
-const API_BASE_URL = 'http://localhost:5000/api';
-
-export default function App() {
-  const [user, setUser] = useState<any>(null);
->>>>>>> 61c0689124276422fb62bfd1b67cfe2b1f4045ab
   const [activeTab, setActiveTab] = useState<'youtube' | 'upload'>('youtube');
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentVideoId, setCurrentVideoId] = useState<string>('');
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<any>(null);
-<<<<<<< HEAD
-
   const navigate = useNavigate();
-=======
->>>>>>> 61c0689124276422fb62bfd1b67cfe2b1f4045ab
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -47,23 +35,15 @@ export default function App() {
     setIsLoading(true);
     setSummary('');
     setSelectedHistoryItem(null);
-    
     try {
       const response = await fetch(`${API_BASE_URL}/summarize-youtube`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-<<<<<<< HEAD
-        body: JSON.stringify({ video_url: url, question, user_id: user?.id }), // add user_id
-=======
-        body: JSON.stringify({ video_url: url, question }),
->>>>>>> 61c0689124276422fb62bfd1b67cfe2b1f4045ab
+        body: JSON.stringify({ video_url: url, question, user_id: user?.id }),
       });
       const data = await response.json();
-      
-      // Extract video ID from URL
       const videoIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
-      
       setSummary(data.summary);
       setCurrentVideoId(videoId);
       setCurrentQuestion(question);
@@ -78,7 +58,6 @@ export default function App() {
     setIsLoading(true);
     setSummary('');
     setSelectedHistoryItem(null);
-    
     try {
       const formData = new FormData();
       formData.append('video', file);
@@ -86,13 +65,11 @@ export default function App() {
       if (user?.id) {
         formData.append('user_id', user.id);
       }
-
       const response = await fetch(`${API_BASE_URL}/summarize-upload`, {
         method: 'POST',
         body: formData,
       });
       const data = await response.json();
-      
       setSummary(data.summary);
       setCurrentVideoId('');
       setCurrentQuestion(question);
@@ -104,17 +81,9 @@ export default function App() {
   };
 
   const handleHistorySelect = (item: any) => {
-<<<<<<< HEAD
     navigate(`/history/${item.id}`, { state: { item } });
-=======
-    setSelectedHistoryItem(item);
-    setSummary(item.answer);
-    setCurrentQuestion(item.question);
-    setCurrentVideoId(item.video_id || '');
->>>>>>> 61c0689124276422fb62bfd1b67cfe2b1f4045ab
   };
 
-  // Animated login screen
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 relative overflow-hidden">
@@ -124,7 +93,6 @@ export default function App() {
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse delay-500"></div>
         </div>
-
         <motion.div
           initial={{ opacity: 0, y: 40, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -157,7 +125,6 @@ export default function App() {
                 <Sparkles className="w-6 h-6 text-yellow-300" />
               </motion.div>
             </motion.div>
-            
             <motion.h1 
               className="text-4xl font-bold text-white text-center bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent"
               initial={{ opacity: 0, y: 20 }}
@@ -166,7 +133,6 @@ export default function App() {
             >
               YouTubeBuddy
             </motion.h1>
-            
             <motion.p 
               className="text-white/80 text-center text-lg"
               initial={{ opacity: 0, y: 20 }}
@@ -176,7 +142,6 @@ export default function App() {
               AI-powered video intelligence at your fingertips
             </motion.p>
           </motion.div>
-
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -184,7 +149,6 @@ export default function App() {
             className="space-y-4"
           >
             <AuthButton onAuth={setUser} />
-            
             <div className="flex items-center justify-center space-x-6 text-white/60 text-sm">
               <div className="flex items-center space-x-2">
                 <Zap className="w-4 h-4" />
@@ -197,7 +161,6 @@ export default function App() {
             </div>
           </motion.div>
         </motion.div>
-        
         <Toaster 
           position="top-right"
           toastOptions={{
@@ -212,8 +175,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Main dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Header */}
@@ -250,7 +211,6 @@ export default function App() {
               <p className="text-xs text-gray-500">AI Video Intelligence</p>
             </div>
           </motion.div>
-          
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -260,7 +220,6 @@ export default function App() {
           </motion.div>
         </div>
       </motion.header>
-
       <main className="max-w-7xl mx-auto py-8 px-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -305,7 +264,6 @@ export default function App() {
                 </motion.button>
               </div>
             </motion.div>
-
             {/* Tab Content */}
             <AnimatePresence mode="wait">
               {activeTab === 'youtube' ? (
@@ -330,7 +288,6 @@ export default function App() {
                 </motion.div>
               )}
             </AnimatePresence>
-
             {/* Summary Display */}
             <AnimatePresence>
               {(summary || isLoading) && (
@@ -350,7 +307,6 @@ export default function App() {
               )}
             </AnimatePresence>
           </div>
-
           {/* History Sidebar */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -362,7 +318,6 @@ export default function App() {
           </motion.div>
         </div>
       </main>
-
       {/* Footer */}
       <motion.footer 
         className="bg-white/50 backdrop-blur-xl border-t border-white/20 mt-16 py-8"
@@ -376,7 +331,6 @@ export default function App() {
           </p>
         </div>
       </motion.footer>
-
       <Toaster 
         position="top-right"
         toastOptions={{
