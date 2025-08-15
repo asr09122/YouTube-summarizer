@@ -1,6 +1,7 @@
 import os
 import re
-import numpy as np
+import json
+import http.client
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -23,7 +24,8 @@ CORS(app)
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
 openai_api_key = os.getenv("OPENAI_API_KEY")
-HF_TOKEN = os.getenv("HF_TOKEN")  # Add this to your .env
+HF_TOKEN = os.getenv("HF_TOKEN")
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 
 if not supabase_url or not supabase_anon_key:
     raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY are required")
@@ -32,9 +34,6 @@ if not supabase_url or not supabase_anon_key:
 SPACE_NAME = "asr3232/Youtube_summarizer_model"
 client = Client(SPACE_NAME, hf_token=HF_TOKEN)
 
-import json
-import numpy as np
-
 class RemoteGradioEmbeddings(Embeddings):
     def __init__(self, client, normalize=True):
         self.client = client
@@ -42,20 +41,14 @@ class RemoteGradioEmbeddings(Embeddings):
 
     def embed_documents(self, texts):
         text_input = json.dumps(texts) if isinstance(texts, list) else texts
-        vecs = self.client.predict(text_input, self.normalize, api_name="/embed")
-        return vecs  # Already a list of lists of floats
+        return self.client.predict(text_input, self.normalize, api_name="/embed")
 
     def embed_query(self, text):
         return self.embed_documents([text])[0]
 
-
-# Use RemoteGradioEmbeddings instead of local HuggingFace
 embeddings = RemoteGradioEmbeddings(client)
 
 # === OpenAI LLM ===
-if not openai_api_key:
-    print("Warning: OPENAI_API_KEY not found. Set it in your .env file.")
-
 llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     model="google/gemma-3-12b-it:free",
@@ -77,8 +70,33 @@ prompt = PromptTemplate(
     input_variables=['context', 'question']
 )
 
-# === Transcript Functions ===
-def get_youtube_transcript(video_id):
+# === Transcript Fetching (RapidAPI first, fallback to YouTubeTranscriptApi) ===
+def get_youtube_transcript(video_id, lang="en"):
+    # Try RapidAPI first
+    try:
+        conn = http.client.HTTPSConnection("youtube-transcriptor.p.rapidapi.com")
+        headers = {
+            'x-rapidapi-key': RAPIDAPI_KEY,
+            'x-rapidapi-host': "youtube-transcriptor.p.rapidapi.com"
+        }
+        conn.request("GET", f"/transcript?video_id={video_id}&lang={lang}", headers=headers)
+        res = conn.getresponse()
+        data = res.read()
+        json_data = json.loads(data.decode("utf-8"))
+
+        if isinstance(json_data, list):
+            json_data = json_data[0]
+
+        if "transcription" in json_data:
+            raw_text = " ".join(item["subtitle"] for item in json_data["transcription"])
+            cleaned_text = re.sub(r"\s+", " ", raw_text)
+            cleaned_text = cleaned_text.replace("&#39;", "'").replace("&quot;", '"')
+            language_code = json_data.get("availableLangs", [lang])[0]
+            return cleaned_text.strip(), language_code
+    except Exception as e:
+        print("RapidAPI transcript fetch failed:", e)
+
+    # Fallback: YouTubeTranscriptApi
     try:
         transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
         transcript = " ".join(chunk["text"] for chunk in transcript_list)
@@ -92,6 +110,7 @@ def get_youtube_transcript(video_id):
         except Exception:
             return None, None
 
+# === Translation if needed ===
 def translate_to_english(text, src_lang):
     if src_lang == "en":
         return text
@@ -132,7 +151,6 @@ def summarize_youtube():
 
     answer = summarize_video(transcript, question)
 
-    # Store in Supabase
     supabase = create_client(supabase_url, supabase_anon_key)
     insert_data = {
         "video_url": video_url,
@@ -156,3 +174,6 @@ def get_history():
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
+
+if __name__ == "__main__":
+    app.run(debug=True)
