@@ -1,35 +1,60 @@
 import os
 import re
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+from youtube_transcript_api import YouTubeTranscriptApi
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
-from supabase import create_client, Client
+from supabase import create_client
+from langchain_core.embeddings import Embeddings
 from dotenv import load_dotenv
+from gradio_client import Client
 
+# Load .env variables
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Supabase setup
+# === Environment Variables ===
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")  # Add this to your .env
 
 if not supabase_url or not supabase_anon_key:
-    raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required")
+    raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY are required")
 
-# Multilingual Embeddings
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+# === Gradio Embedding Client ===
+SPACE_NAME = "asr3232/Youtube_summarizer_model"
+client = Client(SPACE_NAME, hf_token=HF_TOKEN)
 
-# OpenAI API key
-openai_api_key = os.getenv("OPENAI_API_KEY")
+import json
+import numpy as np
+
+class RemoteGradioEmbeddings(Embeddings):
+    def __init__(self, client, normalize=True):
+        self.client = client
+        self.normalize = normalize
+
+    def embed_documents(self, texts):
+        text_input = json.dumps(texts) if isinstance(texts, list) else texts
+        vecs = self.client.predict(text_input, self.normalize, api_name="/embed")
+        return vecs  # Already a list of lists of floats
+
+    def embed_query(self, text):
+        return self.embed_documents([text])[0]
+
+
+# Use RemoteGradioEmbeddings instead of local HuggingFace
+embeddings = RemoteGradioEmbeddings(client)
+
+# === OpenAI LLM ===
 if not openai_api_key:
-    print("Warning: OPENAI_API_KEY not found. Please set it in your .env file.")
+    print("Warning: OPENAI_API_KEY not found. Set it in your .env file.")
 
 llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -38,6 +63,7 @@ llm = ChatOpenAI(
     api_key=openai_api_key or "dummy-key",
 )
 
+# === Text Splitter and Prompt ===
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 prompt = PromptTemplate(
     template="""
@@ -48,17 +74,16 @@ prompt = PromptTemplate(
       {context}
       Question: {question}
     """,
-    input_variables = ['context', 'question']
+    input_variables=['context', 'question']
 )
 
+# === Transcript Functions ===
 def get_youtube_transcript(video_id):
-    # Try to get English transcript first
     try:
         transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
         transcript = " ".join(chunk["text"] for chunk in transcript_list)
         return transcript, "en"
     except Exception:
-        # Try to get transcript in any available language
         try:
             transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
             first_transcript = next(iter(transcript_list))
@@ -74,6 +99,7 @@ def translate_to_english(text, src_lang):
     translation = llm.invoke(translation_prompt)
     return translation.content.strip()
 
+# === Summarization Pipeline ===
 def summarize_video(transcript, question):
     chunks = text_splitter.create_documents([transcript])
     vector_store = FAISS.from_documents(chunks, embeddings)
@@ -84,23 +110,29 @@ def summarize_video(transcript, question):
     answer = llm.invoke(final_prompt)
     return answer.content
 
+# === API Endpoints ===
 @app.route("/api/summarize-youtube", methods=["POST"])
 def summarize_youtube():
     data = request.json
     video_url = data.get("video_url")
     question = data.get("question", "Summarize this video")
     user_id = data.get("user_id")
+
     match = re.search(r"(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{11})", video_url)
     video_id = match.group(1) if match else None
     if not video_id:
         return jsonify({"error": "Invalid YouTube URL"}), 400
+
     transcript, lang = get_youtube_transcript(video_id)
     if not transcript:
         return jsonify({"error": "No transcript available"}), 400
+
     if lang != "en":
         transcript = translate_to_english(transcript, lang)
+
     answer = summarize_video(transcript, question)
-    # Store in Supabase (with user_id if provided)
+
+    # Store in Supabase
     supabase = create_client(supabase_url, supabase_anon_key)
     insert_data = {
         "video_url": video_url,
@@ -111,6 +143,7 @@ def summarize_youtube():
     }
     if user_id:
         insert_data["user_id"] = user_id
+
     supabase.table("video_summaries").insert(insert_data).execute()
     return jsonify({"summary": answer})
 
@@ -123,6 +156,3 @@ def get_history():
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
-
-# if __name__ == "__main__":
-#     app.run(debug=True)
