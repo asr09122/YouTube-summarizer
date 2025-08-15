@@ -125,7 +125,7 @@ def summarize_youtube():
 
     transcript, lang = get_youtube_transcript(video_id)
     if not transcript:
-        return jsonify({"error": "No transcript available"}), 400
+        return jsonify({"error": f"No transcript available {video_id}"}), 400
 
     if lang != "en":
         transcript = translate_to_english(transcript, lang)
